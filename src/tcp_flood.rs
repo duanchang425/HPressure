@@ -64,7 +64,8 @@ pub async fn run_tcp_flood(config: TcpFloodConfig) {
                         // 注意：set_keepalive在某些平台上可能不可用
                         #[cfg(unix)]
                         {
-                            stream.set_keepalive(Some(Duration::from_secs(30))).ok();
+                            // 在较新的Rust版本中，set_keepalive方法已被移除，我们跳过这个设置
+                            // stream.set_keepalive(Some(Duration::from_secs(30))).ok();
                         }
 
                         // 生成负载数据
