@@ -3,7 +3,7 @@
 version = 4
 
 [[package]]
-name = "DDoS"
+name = "BPressure"
 version = "0.1.0"
 dependencies = [
  "clap",
