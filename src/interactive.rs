@@ -1,4 +1,4 @@
-use crate::{AttackConfig, UdpFloodConfig, TcpFloodConfig, IcmpFloodConfig, AppConfig};
+use crate::{AttackConfig, UdpFloodConfig, TcpFloodConfig, IcmpFloodConfig, SlowlorisConfig, AppConfig};
 use std::io::{self, Write};
 
 pub async fn start_interactive_mode() {
@@ -16,10 +16,11 @@ pub async fn start_interactive_mode() {
         println!("2. UDP 洪水攻击");
         println!("3. TCP 洪水攻击");
         println!("4. ICMP 洪水攻击");
-        println!("5. 退出");
+        println!("5. Slowloris 攻击");
+        println!("6. 退出");
         println!();
 
-        print!("请输入选择 (1-5): ");
+        print!("请输入选择 (1-6): ");
         io::stdout().flush().unwrap();
 
         let mut choice = String::new();
@@ -48,6 +49,11 @@ pub async fn start_interactive_mode() {
                 }
             }
             "5" => {
+                if let Some(config) = get_slowloris_config(&app_config) {
+                    crate::slowloris::run_slowloris(config).await;
+                }
+            }
+            "6" => {
                 println!("👋 再见！");
                 break;
             }
@@ -429,5 +435,103 @@ fn get_icmp_config(app_config: &AppConfig) -> Option<IcmpFloodConfig> {
         random_packet_size,
         min_packet_size,
         max_packet_size,
+    })
+} 
+
+fn get_slowloris_config(app_config: &AppConfig) -> Option<SlowlorisConfig> {
+    println!("\n🐌 Slowloris攻击配置");
+    println!("===================");
+
+    // 目标
+    print!("目标IP/域名: ");
+    io::stdout().flush().unwrap();
+    let mut target = String::new();
+    io::stdin().read_line(&mut target).unwrap();
+    let target = target.trim().to_string();
+
+    if target.is_empty() {
+        println!("❌ 目标不能为空");
+        return None;
+    }
+
+    // 端口
+    print!("端口 (默认80): ");
+    io::stdout().flush().unwrap();
+    let mut port = String::new();
+    io::stdin().read_line(&mut port).unwrap();
+    let port = port.trim().parse::<u16>().unwrap_or(80);
+
+    // 并发数
+    print!("并发连接数 (默认{}): ", app_config.default_slowloris_connections);
+    io::stdout().flush().unwrap();
+    let mut connections = String::new();
+    io::stdin().read_line(&mut connections).unwrap();
+    let connections = connections.trim().parse::<usize>().unwrap_or(app_config.default_slowloris_connections);
+
+    // 持续时间
+    print!("持续时间(秒) (默认{}): ", app_config.default_duration);
+    io::stdout().flush().unwrap();
+    let mut duration = String::new();
+    io::stdin().read_line(&mut duration).unwrap();
+    let duration = duration.trim().parse::<u64>().unwrap_or(app_config.default_duration);
+
+    // 攻击模式
+    print!("攻击模式 (normal/stealth/aggressive, 默认{}): ", app_config.default_mode);
+    io::stdout().flush().unwrap();
+    let mut mode = String::new();
+    io::stdin().read_line(&mut mode).unwrap();
+    let mode = mode.trim().to_lowercase();
+    let mode = if mode.is_empty() || (mode != "normal" && mode != "stealth" && mode != "aggressive") {
+        app_config.default_mode.clone()
+    } else {
+        mode
+    };
+
+    // 超时时间
+    print!("超时时间(秒) (默认30): ");
+    io::stdout().flush().unwrap();
+    let mut timeout = String::new();
+    io::stdin().read_line(&mut timeout).unwrap();
+    let timeout = timeout.trim().parse::<u64>().unwrap_or(30);
+
+    // 保持连接
+    print!("保持连接? (y/N): ");
+    io::stdout().flush().unwrap();
+    let mut keep_alive = String::new();
+    io::stdin().read_line(&mut keep_alive).unwrap();
+    let keep_alive = keep_alive.trim().to_lowercase() == "y";
+
+    // 随机头部
+    print!("随机头部? (y/N): ");
+    io::stdout().flush().unwrap();
+    let mut random_headers = String::new();
+    io::stdin().read_line(&mut random_headers).unwrap();
+    let random_headers = random_headers.trim().to_lowercase() == "y";
+
+    // 最小间隔
+    print!("最小间隔(毫秒) (默认10): ");
+    io::stdout().flush().unwrap();
+    let mut min_interval = String::new();
+    io::stdin().read_line(&mut min_interval).unwrap();
+    let min_interval = min_interval.trim().parse::<u64>().unwrap_or(10);
+
+    // 最大间隔
+    print!("最大间隔(毫秒) (默认50): ");
+    io::stdout().flush().unwrap();
+    let mut max_interval = String::new();
+    io::stdin().read_line(&mut max_interval).unwrap();
+    let max_interval = max_interval.trim().parse::<u64>().unwrap_or(50);
+
+    Some(SlowlorisConfig {
+        target,
+        port,
+        connections,
+        duration,
+        mode,
+        timeout,
+        keep_alive,
+        random_headers,
+        min_interval,
+        max_interval,
     })
 } 

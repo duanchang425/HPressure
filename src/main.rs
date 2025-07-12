@@ -3,6 +3,7 @@ mod stats;
 mod udp_flood;
 mod tcp_flood;
 mod icmp_flood;
+mod slowloris;
 mod interactive;
 mod config;
 
@@ -11,6 +12,7 @@ use attack::{run_attack, AttackConfig};
 use udp_flood::{run_udp_flood, UdpFloodConfig};
 use tcp_flood::{run_tcp_flood, TcpFloodConfig};
 use icmp_flood::{run_icmp_flood, IcmpFloodConfig};
+use slowloris::{run_slowloris, SlowlorisConfig};
 use interactive::start_interactive_mode;
 use config::AppConfig;
 
@@ -44,7 +46,7 @@ struct Args {
     /// 攻击模式 (normal/stealth/aggressive)
     #[arg(short, long)]
     mode: Option<String>,
-    /// 攻击类型 (http/udp/tcp/icmp)
+    /// 攻击类型 (http/udp/tcp/icmp/slowloris)
     #[arg(short, long, default_value = "http")]
     attack_type: String,
     /// 数据包大小
@@ -68,6 +70,21 @@ struct Args {
     /// 最大数据包大小 (ICMP)
     #[arg(long, default_value_t = 1024)]
     max_packet_size: usize,
+    /// 超时时间 (Slowloris)
+    #[arg(long, default_value_t = 30)]
+    timeout: u64,
+    /// 保持连接 (Slowloris)
+    #[arg(long)]
+    keep_alive: bool,
+    /// 随机头部 (Slowloris)
+    #[arg(long)]
+    random_headers: bool,
+    /// 最小间隔 (Slowloris)
+    #[arg(long, default_value_t = 10)]
+    min_interval: u64,
+    /// 最大间隔 (Slowloris)
+    #[arg(long, default_value_t = 50)]
+    max_interval: u64,
     /// 交互模式
     #[arg(short, long)]
     interactive: bool,
@@ -96,6 +113,7 @@ async fn main() {
                 "udp" => config.default_udp_connections,
                 "tcp" => config.default_tcp_connections,
                 "icmp" => config.default_icmp_connections,
+                "slowloris" => config.default_slowloris_connections,
                 _ => config.default_http_connections,
             }
         });
@@ -145,7 +163,7 @@ async fn main() {
             }
             "icmp" => {
                 let config = IcmpFloodConfig {
-                    target,
+                    target: target.clone(),
                     connections,
                     duration,
                     packet_size,
@@ -157,9 +175,24 @@ async fn main() {
                 };
                 run_icmp_flood(config).await;
             }
+            "slowloris" => {
+                let config = SlowlorisConfig {
+                    target,
+                    port: args.port,
+                    connections,
+                    duration,
+                    mode,
+                    timeout: args.timeout,
+                    keep_alive: args.keep_alive,
+                    random_headers: args.random_headers,
+                    min_interval: args.min_interval,
+                    max_interval: args.max_interval,
+                };
+                run_slowloris(config).await;
+            }
             _ => {
                 eprintln!("❌ 不支持的攻击类型: {}", args.attack_type);
-                eprintln!("支持的类型: http, udp, tcp, icmp");
+                eprintln!("支持的类型: http, udp, tcp, icmp, slowloris");
             }
         }
     } else {

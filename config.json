@@ -1,0 +1,12 @@
+{
+  "default_http_connections": 1000,
+  "default_udp_connections": 1000,
+  "default_tcp_connections": 1000,
+  "default_icmp_connections": 1000,
+  "default_slowloris_connections": 500,
+  "default_duration": 60,
+  "default_packet_size": 1024,
+  "default_mode": "normal",
+  "max_connections": 10000,
+  "timeout_seconds": 30
+}
