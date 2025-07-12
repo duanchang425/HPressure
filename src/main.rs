@@ -2,14 +2,17 @@ mod attack;
 mod stats;
 mod udp_flood;
 mod tcp_flood;
+mod icmp_flood;
 mod interactive;
-// mod config; // 暂时禁用
+mod config;
 
 use clap::Parser;
 use attack::{run_attack, AttackConfig};
 use udp_flood::{run_udp_flood, UdpFloodConfig};
 use tcp_flood::{run_tcp_flood, TcpFloodConfig};
+use icmp_flood::{run_icmp_flood, IcmpFloodConfig};
 use interactive::start_interactive_mode;
+use config::AppConfig;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -21,11 +24,11 @@ struct Args {
     #[arg(short, long, default_value_t = 80)]
     port: u16,
     /// 并发连接数
-    #[arg(short, long, default_value_t = 1000)]
-    connections: usize,
+    #[arg(short, long)]
+    connections: Option<usize>,
     /// 请求持续时间（秒）
-    #[arg(short, long, default_value_t = 60)]
-    duration: u64,
+    #[arg(short, long)]
+    duration: Option<u64>,
     /// 是否使用HTTPS
     #[arg(long)]
     https: bool,
@@ -39,20 +42,32 @@ struct Args {
     #[arg(long)]
     user_agent: Option<String>,
     /// 攻击模式 (normal/stealth/aggressive)
-    #[arg(short, long, default_value = "normal")]
-    mode: String,
-    /// 攻击类型 (http/udp/tcp)
+    #[arg(short, long)]
+    mode: Option<String>,
+    /// 攻击类型 (http/udp/tcp/icmp)
     #[arg(short, long, default_value = "http")]
     attack_type: String,
     /// 数据包大小
-    #[arg(long, default_value_t = 1024)]
-    packet_size: usize,
+    #[arg(long)]
+    packet_size: Option<usize>,
     /// TCP负载类型 (random/http/custom)
     #[arg(long, default_value = "random")]
     payload_type: String,
     /// 自定义TCP负载
     #[arg(long)]
     custom_payload: Option<String>,
+    /// 伪装源IP (ICMP)
+    #[arg(long)]
+    spoof_source: bool,
+    /// 随机数据包大小 (ICMP)
+    #[arg(long)]
+    random_packet_size: bool,
+    /// 最小数据包大小 (ICMP)
+    #[arg(long, default_value_t = 64)]
+    min_packet_size: usize,
+    /// 最大数据包大小 (ICMP)
+    #[arg(long, default_value_t = 1024)]
+    max_packet_size: usize,
     /// 交互模式
     #[arg(short, long)]
     interactive: bool,
@@ -61,6 +76,10 @@ struct Args {
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
+    
+    // 加载配置文件
+    let config = AppConfig::load();
+    println!("📋 已加载配置文件");
 
     // 交互模式
     if args.interactive {
@@ -70,18 +89,33 @@ async fn main() {
 
     // 命令行模式
     if let Some(target) = args.target {
+        // 使用命令行参数或配置文件默认值
+        let connections = args.connections.unwrap_or_else(|| {
+            match args.attack_type.to_lowercase().as_str() {
+                "http" | "https" => config.default_http_connections,
+                "udp" => config.default_udp_connections,
+                "tcp" => config.default_tcp_connections,
+                "icmp" => config.default_icmp_connections,
+                _ => config.default_http_connections,
+            }
+        });
+        
+        let duration = args.duration.unwrap_or(config.default_duration);
+        let mode = args.mode.unwrap_or(config.default_mode);
+        let packet_size = args.packet_size.unwrap_or(config.default_packet_size);
+
         match args.attack_type.to_lowercase().as_str() {
             "http" | "https" => {
                 let config = AttackConfig {
                     target: target.clone(),
                     port: args.port,
-                    connections: args.connections,
-                    duration: args.duration,
+                    connections,
+                    duration,
                     https: args.https,
                     method: args.method.to_uppercase(),
                     post_data: args.post_data,
                     user_agent: args.user_agent,
-                    mode: args.mode,
+                    mode,
                 };
                 run_attack(config).await;
             }
@@ -89,29 +123,43 @@ async fn main() {
                 let config = UdpFloodConfig {
                     target: target.clone(),
                     port: args.port,
-                    connections: args.connections,
-                    duration: args.duration,
-                    packet_size: args.packet_size,
-                    mode: args.mode,
+                    connections,
+                    duration,
+                    packet_size,
+                    mode,
                 };
                 run_udp_flood(config).await;
             }
             "tcp" => {
                 let config = TcpFloodConfig {
-                    target,
+                    target: target.clone(),
                     port: args.port,
-                    connections: args.connections,
-                    duration: args.duration,
-                    packet_size: args.packet_size,
-                    mode: args.mode,
+                    connections,
+                    duration,
+                    packet_size,
+                    mode,
                     payload_type: args.payload_type,
                     custom_payload: args.custom_payload,
                 };
                 run_tcp_flood(config).await;
             }
+            "icmp" => {
+                let config = IcmpFloodConfig {
+                    target,
+                    connections,
+                    duration,
+                    packet_size,
+                    mode,
+                    spoof_source: args.spoof_source,
+                    random_packet_size: args.random_packet_size,
+                    min_packet_size: args.min_packet_size,
+                    max_packet_size: args.max_packet_size,
+                };
+                run_icmp_flood(config).await;
+            }
             _ => {
                 eprintln!("❌ 不支持的攻击类型: {}", args.attack_type);
-                eprintln!("支持的类型: http, udp, tcp");
+                eprintln!("支持的类型: http, udp, tcp, icmp");
             }
         }
     } else {

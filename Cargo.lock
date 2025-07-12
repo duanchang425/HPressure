@@ -12,6 +12,9 @@ dependencies = [
  "rand",
  "rayon",
  "reqwest",
+ "serde",
+ "serde_json",
+ "socket2",
  "tokio",
 ]
 

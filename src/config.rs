@@ -6,6 +6,8 @@ use std::path::Path;
 pub struct AppConfig {
     pub default_http_connections: usize,
     pub default_udp_connections: usize,
+    pub default_tcp_connections: usize,
+    pub default_icmp_connections: usize,
     pub default_duration: u64,
     pub default_packet_size: usize,
     pub default_mode: String,
@@ -18,6 +20,8 @@ impl Default for AppConfig {
         Self {
             default_http_connections: 1000,
             default_udp_connections: 1000,
+            default_tcp_connections: 1000,
+            default_icmp_connections: 1000,
             default_duration: 60,
             default_packet_size: 1024,
             default_mode: "normal".to_string(),

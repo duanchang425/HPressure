@@ -18,7 +18,7 @@
 
 ## 功能特性
 
-- 🚀 **极高性能**: 支持HTTP/UDP/TCP三大攻击类型，异步高并发
+- 🚀 **极高性能**: 支持HTTP/UDP/TCP/ICMP四大攻击类型，异步高并发
 - 📊 **实时监控**: 实时显示RPS（每秒请求数）和成功率
 - 🔧 **灵活配置**: 支持自定义目标、端口、并发数、持续时间、数据包大小
 - 📈 **详细统计**: 提供详细的攻击统计信息
@@ -28,6 +28,7 @@
 - 🎯 **攻击模式**: 支持normal、stealth、aggressive三种模式
 - 🌊 **UDP洪水攻击**: 支持UDP数据包洪水攻击
 - 🌪️ **TCP洪水攻击**: 支持TCP洪水攻击，支持random/http/custom三种payload
+- 🎯 **ICMP洪水攻击**: 支持ICMP洪水攻击，支持伪装源IP和随机数据包大小
 - 💬 **交互模式**: 友好的交互式用户界面
 
 ## 安装和编译
@@ -81,10 +82,14 @@ cargo run --release -- --target example.com --port 443 --https
 | `--post-data` | | | POST请求的数据 |
 | `--user-agent` | | | 自定义User-Agent |
 | `--mode` | `-m` | normal | 攻击模式 (normal/stealth/aggressive) |
-| `--attack-type` | `-a` | http | 攻击类型 (http/udp/tcp) |
-| `--packet-size` | | 1024 | UDP/TCP数据包大小 |
+| `--attack-type` | `-a` | http | 攻击类型 (http/udp/tcp/icmp) |
+| `--packet-size` | | 1024 | UDP/TCP/ICMP数据包大小 |
 | `--payload-type` | | random | TCP负载类型 (random/http/custom) |
 | `--custom-payload` | | | TCP自定义负载内容 |
+| `--spoof-source` | | false | ICMP伪装源IP |
+| `--random-packet-size` | | false | ICMP随机数据包大小 |
+| `--min-packet-size` | | 64 | ICMP最小数据包大小 |
+| `--max-packet-size` | | 1024 | ICMP最大数据包大小 |
 | `--interactive` | `-i` | false | 启动交互模式 |
 
 ### 使用示例
@@ -123,9 +128,58 @@ cargo run --release -- --target example.com --port 80 --attack-type tcp --packet
 # TCP洪水攻击（自定义负载）
 cargo run --release -- --target example.com --port 80 --attack-type tcp --packet-size 2048 --payload-type custom --custom-payload "helloDDOS"
 
+# ICMP洪水攻击（基本）
+cargo run --release -- --target example.com --attack-type icmp --packet-size 1024
+
+# ICMP洪水攻击（伪装源IP）
+cargo run --release -- --target example.com --attack-type icmp --spoof-source --packet-size 1024
+
+# ICMP洪水攻击（随机数据包大小）
+cargo run --release -- --target example.com --attack-type icmp --random-packet-size --min-packet-size 64 --max-packet-size 2048
+
+# ICMP洪水攻击（隐蔽模式）
+cargo run --release -- --target example.com --attack-type icmp --mode stealth --packet-size 512
+
 # 交互模式
 cargo run --release -- --interactive
 ```
+
+## 配置文件支持
+
+工具支持通过 `config.json` 配置文件自定义默认参数。
+
+- 首次运行时会自动在程序目录下生成 `config.json`。
+- 你可以手动编辑该文件，修改默认并发数、持续时间、数据包大小、模式等。
+- 命令行参数或交互输入留空时，将自动采用配置文件中的默认值。
+
+### 配置文件示例
+```json
+{
+  "default_http_connections": 1000,
+  "default_udp_connections": 1000,
+  "default_tcp_connections": 1000,
+  "default_icmp_connections": 1000,
+  "default_duration": 60,
+  "default_packet_size": 1024,
+  "default_mode": "normal",
+  "max_connections": 10000,
+  "timeout_seconds": 30
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| default_http_connections | HTTP/HTTPS 默认并发连接数 |
+| default_udp_connections  | UDP 默认并发连接数 |
+| default_tcp_connections  | TCP 默认并发连接数 |
+| default_icmp_connections | ICMP 默认并发连接数 |
+| default_duration         | 默认攻击持续时间（秒） |
+| default_packet_size      | UDP/TCP/ICMP 默认数据包大小（字节） |
+| default_mode             | 默认攻击模式（normal/stealth/aggressive） |
+| max_connections          | 最大允许连接数 |
+| timeout_seconds          | 网络超时时间（秒） |
+
+> **提示**：如需批量测试或统一调整默认参数，建议直接编辑 `config.json`。
 
 ## 性能优化建议
 
@@ -222,6 +276,25 @@ cargo run --release -- --interactive
    - 并发数：用户指定值的300%
    - 延迟：1-10ms随机延迟
    - 特点：最大化UDP攻击强度
+   - 适用：对性能要求极高的场景
+
+### ICMP攻击模式
+
+1. **Normal模式** (默认)
+   - 并发数：用户指定值
+   - 延迟：10-50ms随机延迟
+   - 特点：平衡性能和隐蔽性
+
+2. **Stealth模式** (隐蔽)
+   - 并发数：用户指定值的50%
+   - 延迟：50-200ms随机延迟
+   - 特点：高度隐蔽，减少被检测风险
+   - 适用：需要高度隐蔽的场景
+
+3. **Aggressive模式** (激进)
+   - 并发数：用户指定值的300%
+   - 延迟：1-10ms随机延迟
+   - 特点：最大化ICMP攻击强度
    - 适用：对性能要求极高的场景
 
 ### TCP攻击模式

