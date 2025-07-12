@@ -18,14 +18,17 @@
 
 ## 功能特性
 
-- 🚀 **极高性能**: 使用异步编程和连接池，支持数千并发连接
+- 🚀 **极高性能**: 支持HTTP/UDP/TCP三大攻击类型，异步高并发
 - 📊 **实时监控**: 实时显示RPS（每秒请求数）和成功率
-- 🔧 **灵活配置**: 支持自定义目标、端口、并发数和持续时间
+- 🔧 **灵活配置**: 支持自定义目标、端口、并发数、持续时间、数据包大小
 - 📈 **详细统计**: 提供详细的攻击统计信息
 - 🛡️ **连接优化**: 自动优化连接参数以获得最佳性能
 - 🔄 **多种HTTP方法**: 支持GET和POST请求
-- 🎭 **智能伪装**: 随机User-Agent和真实浏览器请求头
+- 🎭 **智能伪装**: 随机User-Agent、Referer、X-Forwarded-For等真实浏览器风格头部
 - 🎯 **攻击模式**: 支持normal、stealth、aggressive三种模式
+- 🌊 **UDP洪水攻击**: 支持UDP数据包洪水攻击
+- 🌪️ **TCP洪水攻击**: 支持TCP洪水攻击，支持random/http/custom三种payload
+- 💬 **交互模式**: 友好的交互式用户界面
 
 ## 安装和编译
 
@@ -74,10 +77,15 @@ cargo run --release -- --target example.com --port 443 --https
 | `--connections` | `-c` | 1000 | 并发连接数 |
 | `--duration` | `-d` | 60 | 攻击持续时间（秒） |
 | `--https` | | false | 使用HTTPS协议 |
-| `--method` | `-m` | GET | HTTP方法 (GET/POST) |
+| `--method` | | GET | HTTP方法 (GET/POST) |
 | `--post-data` | | | POST请求的数据 |
 | `--user-agent` | | | 自定义User-Agent |
-| `--mode` | | normal | 攻击模式 (normal/stealth/aggressive) |
+| `--mode` | `-m` | normal | 攻击模式 (normal/stealth/aggressive) |
+| `--attack-type` | `-a` | http | 攻击类型 (http/udp/tcp) |
+| `--packet-size` | | 1024 | UDP/TCP数据包大小 |
+| `--payload-type` | | random | TCP负载类型 (random/http/custom) |
+| `--custom-payload` | | | TCP自定义负载内容 |
+| `--interactive` | `-i` | false | 启动交互模式 |
 
 ### 使用示例
 
@@ -102,6 +110,21 @@ cargo run --release -- --target example.com --port 80 --mode aggressive --connec
 
 # 自定义User-Agent
 cargo run --release -- --target example.com --port 80 --user-agent "MyBot/1.0"
+
+# UDP洪水攻击
+cargo run --release -- --target example.com --port 80 --attack-type udp --packet-size 2048
+
+# TCP洪水攻击（随机负载）
+cargo run --release -- --target example.com --port 80 --attack-type tcp --packet-size 2048 --payload-type random
+
+# TCP洪水攻击（HTTP负载）
+cargo run --release -- --target example.com --port 80 --attack-type tcp --packet-size 2048 --payload-type http
+
+# TCP洪水攻击（自定义负载）
+cargo run --release -- --target example.com --port 80 --attack-type tcp --packet-size 2048 --payload-type custom --custom-payload "helloDDOS"
+
+# 交互模式
+cargo run --release -- --interactive
 ```
 
 ## 性能优化建议
@@ -173,13 +196,51 @@ cargo run --release -- --target example.com --port 80 --user-agent "MyBot/1.0"
 2. **Stealth模式** (隐蔽)
    - 并发数：用户指定值的50%
    - 延迟：100-500ms随机延迟
-   - 特点：添加Referer、Sec-Fetch等伪装头
+   - 特点：添加Referer、Sec-Fetch等伪装头、X-Forwarded-For等
    - 适用：需要高度隐蔽的场景
 
 3. **Aggressive模式** (激进)
-   - 并发数：用户指定值的200%
+   - 并发数：用户指定值的200%及以上
    - 延迟：10-50ms随机延迟
    - 特点：最大化攻击强度
+   - 适用：对性能要求极高的场景
+
+### UDP攻击模式
+
+1. **Normal模式** (默认)
+   - 并发数：用户指定值
+   - 延迟：10-50ms随机延迟
+   - 特点：平衡性能和隐蔽性
+
+2. **Stealth模式** (隐蔽)
+   - 并发数：用户指定值的30%
+   - 延迟：50-200ms随机延迟
+   - 特点：高度隐蔽，减少被检测风险
+   - 适用：需要高度隐蔽的场景
+
+3. **Aggressive模式** (激进)
+   - 并发数：用户指定值的300%
+   - 延迟：1-10ms随机延迟
+   - 特点：最大化UDP攻击强度
+   - 适用：对性能要求极高的场景
+
+### TCP攻击模式
+
+1. **Normal模式** (默认)
+   - 并发数：用户指定值
+   - 延迟：5-25ms随机延迟
+   - 特点：平衡性能和隐蔽性
+
+2. **Stealth模式** (隐蔽)
+   - 并发数：用户指定值的40%
+   - 延迟：20-100ms随机延迟
+   - 特点：高度隐蔽，减少被检测风险
+   - 适用：需要高度隐蔽的场景
+
+3. **Aggressive模式** (激进)
+   - 并发数：用户指定值的400%
+   - 延迟：1-5ms随机延迟
+   - 特点：最大化TCP攻击强度
    - 适用：对性能要求极高的场景
 
 ## 技术架构
@@ -190,7 +251,7 @@ cargo run --release -- --target example.com --port 80 --user-agent "MyBot/1.0"
 2. **并发任务管理**: 使用`tokio`运行时，支持数千个并发任务
 3. **统计收集**: 使用线程安全的统计收集器
 4. **进度监控**: 实时显示攻击进度和性能指标
-5. **智能伪装**: 随机User-Agent和真实浏览器请求头
+5. **智能伪装**: 随机User-Agent、Referer、X-Forwarded-For等真实浏览器风格头部
 
 ### 性能特性
 

