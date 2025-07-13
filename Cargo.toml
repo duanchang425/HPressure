@@ -2,6 +2,12 @@
 name = "HPressure"
 version = "0.1.0"
 edition = "2021"
+license = "GPL-3.0"
+authors = ["HPressure Contributors"]
+description = "高性能DDoS压力测试工具"
+repository = "https://github.com/your-username/HPressure"
+keywords = ["ddos", "stress-test", "network", "security"]
+categories = ["command-line-utilities", "network-programming"]
 
 [dependencies]
 tokio = { version = "1.0", features = ["full"] }

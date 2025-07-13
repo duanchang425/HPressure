@@ -1,22 +1,24 @@
-mod attack;
-mod stats;
-mod udp_flood;
-mod tcp_flood;
-mod icmp_flood;
-mod slowloris;
-mod syn_flood;
-mod interactive;
-mod config;
+/*
+ * HPressure - 高性能DDoS压力测试工具
+ * Copyright (C) 2024 HPressure Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 use clap::Parser;
-use attack::{run_attack, AttackConfig};
-use udp_flood::{run_udp_flood, UdpFloodConfig};
-use tcp_flood::{run_tcp_flood, TcpFloodConfig};
-use icmp_flood::{run_icmp_flood, IcmpFloodConfig};
-use slowloris::{run_slowloris, SlowlorisConfig};
-use syn_flood::{run_syn_flood, SynFloodConfig};
-use interactive::start_interactive_mode;
-use config::AppConfig;
+use HPressure::{attacks::{AttackConfig, AttackType, AttackManager}, AppConfig};
+use HPressure::interactive::start_interactive_mode;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -100,7 +102,7 @@ async fn main() {
     let args = Args::parse();
     
     // 加载配置文件
-    let config = AppConfig::load();
+    let app_config = AppConfig::load();
     println!("📋 已加载配置文件");
 
     // 交互模式
@@ -111,111 +113,86 @@ async fn main() {
 
     // 命令行模式
     if let Some(target) = args.target {
+        let attack_manager = AttackManager::new();
+        
         // 使用命令行参数或配置文件默认值
         let connections = args.connections.unwrap_or_else(|| {
             match args.attack_type.to_lowercase().as_str() {
-                "http" | "https" => config.default_http_connections,
-                "udp" => config.default_udp_connections,
-                "tcp" => config.default_tcp_connections,
-                "icmp" => config.default_icmp_connections,
-                "slowloris" => config.default_slowloris_connections,
-                "syn" => config.default_syn_connections,
-                _ => config.default_http_connections,
+                "http" | "https" => app_config.default_http_connections,
+                "udp" => app_config.default_udp_connections,
+                "tcp" => app_config.default_tcp_connections,
+                "icmp" => app_config.default_icmp_connections,
+                "slowloris" => app_config.default_slowloris_connections,
+                "syn" => app_config.default_syn_connections,
+                _ => app_config.default_http_connections,
             }
         });
         
-        let duration = args.duration.unwrap_or(config.default_duration);
-        let mode = args.mode.unwrap_or(config.default_mode);
-        let packet_size = args.packet_size.unwrap_or(config.default_packet_size);
+        let duration = args.duration.unwrap_or(app_config.default_duration);
+        let mode = args.mode.unwrap_or(app_config.default_mode);
+        let packet_size = args.packet_size.unwrap_or(app_config.default_packet_size);
 
-        match args.attack_type.to_lowercase().as_str() {
-            "http" | "https" => {
-                let config = AttackConfig {
-                    target: target.clone(),
-                    port: args.port,
-                    connections,
-                    duration,
-                    https: args.https,
-                    method: args.method.to_uppercase(),
-                    post_data: args.post_data,
-                    user_agent: args.user_agent,
-                    mode,
-                };
-                run_attack(config).await;
+        // 根据攻击类型创建配置
+        let attack_type = AttackType::from_str(&args.attack_type).unwrap_or(AttackType::Http);
+        let mut config = AttackConfig::new(attack_type.clone(), target, args.port);
+        
+        // 设置通用参数
+        config.connections = connections;
+        config.duration = duration;
+        config.mode = mode;
+        config.packet_size = packet_size;
+
+        // 根据攻击类型设置特定参数
+        match attack_type {
+            AttackType::Http => {
+                config.https = args.https;
+                config.method = args.method.to_uppercase();
+                config.post_data = args.post_data;
+                config.user_agent = args.user_agent;
             }
-            "udp" => {
-                let config = UdpFloodConfig {
-                    target: target.clone(),
-                    port: args.port,
-                    connections,
-                    duration,
-                    packet_size,
-                    mode,
-                };
-                run_udp_flood(config).await;
+            AttackType::Tcp => {
+                config.payload_type = args.payload_type;
+                config.custom_payload = args.custom_payload;
             }
-            "tcp" => {
-                let config = TcpFloodConfig {
-                    target: target.clone(),
-                    port: args.port,
-                    connections,
-                    duration,
-                    packet_size,
-                    mode,
-                    payload_type: args.payload_type,
-                    custom_payload: args.custom_payload,
-                };
-                run_tcp_flood(config).await;
+            AttackType::Icmp => {
+                config.spoof_source = args.spoof_source;
+                config.random_packet_size = args.random_packet_size;
+                config.min_packet_size = args.min_packet_size;
+                config.max_packet_size = args.max_packet_size;
             }
-            "icmp" => {
-                let config = IcmpFloodConfig {
-                    target: target.clone(),
-                    connections,
-                    duration,
-                    packet_size,
-                    mode,
-                    spoof_source: args.spoof_source,
-                    random_packet_size: args.random_packet_size,
-                    min_packet_size: args.min_packet_size,
-                    max_packet_size: args.max_packet_size,
-                };
-                run_icmp_flood(config).await;
+            AttackType::Slowloris => {
+                config.timeout = args.timeout;
+                config.keep_alive = args.keep_alive;
+                config.random_headers = args.random_headers;
+                config.min_interval = args.min_interval;
+                config.max_interval = args.max_interval;
             }
-            "slowloris" => {
-                let config = SlowlorisConfig {
-                    target,
-                    port: args.port,
-                    connections,
-                    duration,
-                    mode,
-                    timeout: args.timeout,
-                    keep_alive: args.keep_alive,
-                    random_headers: args.random_headers,
-                    min_interval: args.min_interval,
-                    max_interval: args.max_interval,
-                };
-                run_slowloris(config).await;
+            AttackType::Syn => {
+                config.spoof_ip = args.spoof_ip;
             }
-            "syn" => {
-                let config = SynFloodConfig {
-                    target,
-                    port: args.port,
-                    connections,
-                    duration,
-                    packet_size,
-                    mode,
-                    spoof_ip: args.spoof_ip,
-                };
-                run_syn_flood(config).await;
-            }
-            _ => {
-                eprintln!("❌ 不支持的攻击类型: {}", args.attack_type);
-                eprintln!("支持的类型: http, udp, tcp, icmp, slowloris, syn");
-            }
+            _ => {}
         }
+
+        // 执行攻击
+        println!("🚀 开始 {} 攻击...", attack_type.as_str());
+        let result = attack_manager.run_attack(config).await;
+        
+        // 显示结果
+        display_result(&result);
     } else {
-        eprintln!("❌ 请指定目标IP/域名或使用 --interactive 进入交互模式");
-        eprintln!("示例: {} --target 127.0.0.1 --port 8080", std::env::args().next().unwrap());
-        eprintln!("或使用: {} --interactive", std::env::args().next().unwrap());
+        println!("❌ 请指定目标IP地址");
+        println!("使用方法: cargo run -- --target example.com --attack-type http");
     }
+}
+
+fn display_result(result: &HPressure::attacks::AttackResult) {
+    println!("\n📊 攻击结果:");
+    println!("总请求数: {}", result.total_requests);
+    println!("成功请求: {}", result.successful_requests);
+    println!("失败请求: {}", result.failed_requests);
+    println!("发送字节: {}", result.bytes_sent);
+    println!("接收字节: {}", result.bytes_received);
+    println!("平均RPS: {:.2}", result.average_rps);
+    println!("成功率: {:.2}%", result.success_rate);
+    println!("持续时间: {:.2}秒", result.duration.as_secs_f64());
 }

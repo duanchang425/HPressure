@@ -1,4 +1,23 @@
-use crate::{AttackConfig, UdpFloodConfig, TcpFloodConfig, IcmpFloodConfig, SlowlorisConfig, SynFloodConfig, AppConfig};
+/*
+ * HPressure - 高性能DDoS压力测试工具
+ * Copyright (C) 2024 HPressure Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+use crate::attacks::{AttackConfig, AttackType, AttackManager, AttackResult};
+use crate::config::AppConfig;
 use std::io::{self, Write};
 
 pub async fn start_interactive_mode() {
@@ -9,6 +28,8 @@ pub async fn start_interactive_mode() {
     let app_config = AppConfig::load();
     println!("📋 已加载配置文件");
     println!();
+
+    let attack_manager = AttackManager::new();
 
     loop {
         println!("请选择攻击类型:");
@@ -31,32 +52,38 @@ pub async fn start_interactive_mode() {
         match choice {
             "1" => {
                 if let Some(config) = get_http_config(&app_config) {
-                    crate::attack::run_attack(config).await;
+                    let result = attack_manager.run_attack(config).await;
+                    display_result(&result);
                 }
             }
             "2" => {
                 if let Some(config) = get_udp_config(&app_config) {
-                    crate::udp_flood::run_udp_flood(config).await;
+                    let result = attack_manager.run_attack(config).await;
+                    display_result(&result);
                 }
             }
             "3" => {
                 if let Some(config) = get_tcp_config(&app_config) {
-                    crate::tcp_flood::run_tcp_flood(config).await;
+                    let result = attack_manager.run_attack(config).await;
+                    display_result(&result);
                 }
             }
             "4" => {
                 if let Some(config) = get_icmp_config(&app_config) {
-                    crate::icmp_flood::run_icmp_flood(config).await;
+                    let result = attack_manager.run_attack(config).await;
+                    display_result(&result);
                 }
             }
             "5" => {
                 if let Some(config) = get_slowloris_config(&app_config) {
-                    crate::slowloris::run_slowloris(config).await;
+                    let result = attack_manager.run_attack(config).await;
+                    display_result(&result);
                 }
             }
             "6" => {
                 if let Some(config) = get_syn_config(&app_config) {
-                    crate::syn_flood::run_syn_flood(config).await;
+                    let result = attack_manager.run_attack(config).await;
+                    display_result(&result);
                 }
             }
             "7" => {
@@ -73,6 +100,18 @@ pub async fn start_interactive_mode() {
         let mut input = String::new();
         io::stdin().read_line(&mut input).unwrap();
     }
+}
+
+fn display_result(result: &AttackResult) {
+    println!("\n📊 攻击结果:");
+    println!("总请求数: {}", result.total_requests);
+    println!("成功请求: {}", result.successful_requests);
+    println!("失败请求: {}", result.failed_requests);
+    println!("发送字节: {}", result.bytes_sent);
+    println!("接收字节: {}", result.bytes_received);
+    println!("平均RPS: {:.2}", result.average_rps);
+    println!("成功率: {:.2}%", result.success_rate);
+    println!("持续时间: {:.2}秒", result.duration.as_secs_f64());
 }
 
 fn get_http_config(app_config: &AppConfig) -> Option<AttackConfig> {
@@ -171,20 +210,19 @@ fn get_http_config(app_config: &AppConfig) -> Option<AttackConfig> {
         Some(user_agent)
     };
 
-    Some(AttackConfig {
-        target,
-        port,
-        connections,
-        duration,
-        https,
-        method,
-        post_data,
-        user_agent,
-        mode,
-    })
+    let mut config = AttackConfig::new(AttackType::Http, target, port);
+    config.connections = connections;
+    config.duration = duration;
+    config.https = https;
+    config.method = method;
+    config.post_data = post_data;
+    config.user_agent = user_agent;
+    config.mode = mode;
+
+    Some(config)
 }
 
-fn get_udp_config(app_config: &AppConfig) -> Option<UdpFloodConfig> {
+fn get_udp_config(app_config: &AppConfig) -> Option<AttackConfig> {
     println!("\n🌊 UDP洪水攻击配置");
     println!("===================");
 
@@ -222,7 +260,7 @@ fn get_udp_config(app_config: &AppConfig) -> Option<UdpFloodConfig> {
     let duration = duration.trim().parse::<u64>().unwrap_or(app_config.default_duration);
 
     // 数据包大小
-    print!("数据包大小(字节) (默认{}): ", app_config.default_packet_size);
+    print!("数据包大小 (默认{}): ", app_config.default_packet_size);
     io::stdout().flush().unwrap();
     let mut packet_size = String::new();
     io::stdin().read_line(&mut packet_size).unwrap();
@@ -240,18 +278,17 @@ fn get_udp_config(app_config: &AppConfig) -> Option<UdpFloodConfig> {
         mode
     };
 
-    Some(UdpFloodConfig {
-        target,
-        port,
-        connections,
-        duration,
-        packet_size,
-        mode,
-    })
+    let mut config = AttackConfig::new(AttackType::Udp, target, port);
+    config.connections = connections;
+    config.duration = duration;
+    config.packet_size = packet_size;
+    config.mode = mode;
+
+    Some(config)
 }
 
-fn get_tcp_config(app_config: &AppConfig) -> Option<TcpFloodConfig> {
-    println!("\n🌊 TCP洪水攻击配置");
+fn get_tcp_config(app_config: &AppConfig) -> Option<AttackConfig> {
+    println!("\n🌐 TCP洪水攻击配置");
     println!("===================");
 
     // 目标
@@ -288,23 +325,11 @@ fn get_tcp_config(app_config: &AppConfig) -> Option<TcpFloodConfig> {
     let duration = duration.trim().parse::<u64>().unwrap_or(app_config.default_duration);
 
     // 数据包大小
-    print!("数据包大小(字节) (默认{}): ", app_config.default_packet_size);
+    print!("数据包大小 (默认{}): ", app_config.default_packet_size);
     io::stdout().flush().unwrap();
     let mut packet_size = String::new();
     io::stdin().read_line(&mut packet_size).unwrap();
     let packet_size = packet_size.trim().parse::<usize>().unwrap_or(app_config.default_packet_size);
-
-    // 攻击模式
-    print!("攻击模式 (normal/stealth/aggressive, 默认{}): ", app_config.default_mode);
-    io::stdout().flush().unwrap();
-    let mut mode = String::new();
-    io::stdin().read_line(&mut mode).unwrap();
-    let mode = mode.trim().to_lowercase();
-    let mode = if mode.is_empty() || (mode != "normal" && mode != "stealth" && mode != "aggressive") {
-        app_config.default_mode.clone()
-    } else {
-        mode
-    };
 
     // 负载类型
     print!("负载类型 (random/http/custom, 默认random): ");
@@ -320,7 +345,7 @@ fn get_tcp_config(app_config: &AppConfig) -> Option<TcpFloodConfig> {
 
     // 自定义负载
     let custom_payload = if payload_type == "custom" {
-        print!("自定义负载数据: ");
+        print!("自定义负载: ");
         io::stdout().flush().unwrap();
         let mut payload = String::new();
         io::stdin().read_line(&mut payload).unwrap();
@@ -334,20 +359,31 @@ fn get_tcp_config(app_config: &AppConfig) -> Option<TcpFloodConfig> {
         None
     };
 
-    Some(TcpFloodConfig {
-        target,
-        port,
-        connections,
-        duration,
-        packet_size,
-        mode,
-        payload_type,
-        custom_payload,
-    })
-} 
+    // 攻击模式
+    print!("攻击模式 (normal/stealth/aggressive, 默认{}): ", app_config.default_mode);
+    io::stdout().flush().unwrap();
+    let mut mode = String::new();
+    io::stdin().read_line(&mut mode).unwrap();
+    let mode = mode.trim().to_lowercase();
+    let mode = if mode.is_empty() || (mode != "normal" && mode != "stealth" && mode != "aggressive") {
+        app_config.default_mode.clone()
+    } else {
+        mode
+    };
 
-fn get_icmp_config(app_config: &AppConfig) -> Option<IcmpFloodConfig> {
-    println!("\n🌊 ICMP洪水攻击配置");
+    let mut config = AttackConfig::new(AttackType::Tcp, target, port);
+    config.connections = connections;
+    config.duration = duration;
+    config.packet_size = packet_size;
+    config.payload_type = payload_type;
+    config.custom_payload = custom_payload;
+    config.mode = mode;
+
+    Some(config)
+}
+
+fn get_icmp_config(app_config: &AppConfig) -> Option<AttackConfig> {
+    println!("\n📡 ICMP洪水攻击配置");
     println!("===================");
 
     // 目标
@@ -377,26 +413,14 @@ fn get_icmp_config(app_config: &AppConfig) -> Option<IcmpFloodConfig> {
     let duration = duration.trim().parse::<u64>().unwrap_or(app_config.default_duration);
 
     // 数据包大小
-    print!("数据包大小(字节) (默认{}): ", app_config.default_packet_size);
+    print!("数据包大小 (默认{}): ", app_config.default_packet_size);
     io::stdout().flush().unwrap();
     let mut packet_size = String::new();
     io::stdin().read_line(&mut packet_size).unwrap();
     let packet_size = packet_size.trim().parse::<usize>().unwrap_or(app_config.default_packet_size);
 
-    // 攻击模式
-    print!("攻击模式 (normal/stealth/aggressive, 默认{}): ", app_config.default_mode);
-    io::stdout().flush().unwrap();
-    let mut mode = String::new();
-    io::stdin().read_line(&mut mode).unwrap();
-    let mode = mode.trim().to_lowercase();
-    let mode = if mode.is_empty() || (mode != "normal" && mode != "stealth" && mode != "aggressive") {
-        app_config.default_mode.clone()
-    } else {
-        mode
-    };
-
-    // 伪装源IP
-    print!("伪装源IP? (y/N): ");
+    // 伪造源IP
+    print!("伪造源IP? (y/N): ");
     io::stdout().flush().unwrap();
     let mut spoof_source = String::new();
     io::stdin().read_line(&mut spoof_source).unwrap();
@@ -410,41 +434,45 @@ fn get_icmp_config(app_config: &AppConfig) -> Option<IcmpFloodConfig> {
     let random_packet_size = random_packet_size.trim().to_lowercase() == "y";
 
     // 最小数据包大小
-    let min_packet_size = if random_packet_size {
-        print!("最小数据包大小(字节) (默认64): ");
-        io::stdout().flush().unwrap();
-        let mut min_size = String::new();
-        io::stdin().read_line(&mut min_size).unwrap();
-        min_size.trim().parse::<usize>().unwrap_or(64)
-    } else {
-        64
-    };
+    print!("最小数据包大小 (默认64): ");
+    io::stdout().flush().unwrap();
+    let mut min_packet_size = String::new();
+    io::stdin().read_line(&mut min_packet_size).unwrap();
+    let min_packet_size = min_packet_size.trim().parse::<usize>().unwrap_or(64);
 
     // 最大数据包大小
-    let max_packet_size = if random_packet_size {
-        print!("最大数据包大小(字节) (默认1024): ");
-        io::stdout().flush().unwrap();
-        let mut max_size = String::new();
-        io::stdin().read_line(&mut max_size).unwrap();
-        max_size.trim().parse::<usize>().unwrap_or(1024)
+    print!("最大数据包大小 (默认1024): ");
+    io::stdout().flush().unwrap();
+    let mut max_packet_size = String::new();
+    io::stdin().read_line(&mut max_packet_size).unwrap();
+    let max_packet_size = max_packet_size.trim().parse::<usize>().unwrap_or(1024);
+
+    // 攻击模式
+    print!("攻击模式 (normal/stealth/aggressive, 默认{}): ", app_config.default_mode);
+    io::stdout().flush().unwrap();
+    let mut mode = String::new();
+    io::stdin().read_line(&mut mode).unwrap();
+    let mode = mode.trim().to_lowercase();
+    let mode = if mode.is_empty() || (mode != "normal" && mode != "stealth" && mode != "aggressive") {
+        app_config.default_mode.clone()
     } else {
-        1024
+        mode
     };
 
-    Some(IcmpFloodConfig {
-        target,
-        connections,
-        duration,
-        packet_size,
-        mode,
-        spoof_source,
-        random_packet_size,
-        min_packet_size,
-        max_packet_size,
-    })
-} 
+    let mut config = AttackConfig::new(AttackType::Icmp, target, 0); // ICMP不需要端口
+    config.connections = connections;
+    config.duration = duration;
+    config.packet_size = packet_size;
+    config.spoof_source = spoof_source;
+    config.random_packet_size = random_packet_size;
+    config.min_packet_size = min_packet_size;
+    config.max_packet_size = max_packet_size;
+    config.mode = mode;
 
-fn get_slowloris_config(app_config: &AppConfig) -> Option<SlowlorisConfig> {
+    Some(config)
+}
+
+fn get_slowloris_config(app_config: &AppConfig) -> Option<AttackConfig> {
     println!("\n🐌 Slowloris攻击配置");
     println!("===================");
 
@@ -481,18 +509,6 @@ fn get_slowloris_config(app_config: &AppConfig) -> Option<SlowlorisConfig> {
     io::stdin().read_line(&mut duration).unwrap();
     let duration = duration.trim().parse::<u64>().unwrap_or(app_config.default_duration);
 
-    // 攻击模式
-    print!("攻击模式 (normal/stealth/aggressive, 默认{}): ", app_config.default_mode);
-    io::stdout().flush().unwrap();
-    let mut mode = String::new();
-    io::stdin().read_line(&mut mode).unwrap();
-    let mode = mode.trim().to_lowercase();
-    let mode = if mode.is_empty() || (mode != "normal" && mode != "stealth" && mode != "aggressive") {
-        app_config.default_mode.clone()
-    } else {
-        mode
-    };
-
     // 超时时间
     print!("超时时间(秒) (默认30): ");
     io::stdout().flush().unwrap();
@@ -515,35 +531,46 @@ fn get_slowloris_config(app_config: &AppConfig) -> Option<SlowlorisConfig> {
     let random_headers = random_headers.trim().to_lowercase() == "y";
 
     // 最小间隔
-    print!("最小间隔(毫秒) (默认10): ");
+    print!("最小间隔(ms) (默认10): ");
     io::stdout().flush().unwrap();
     let mut min_interval = String::new();
     io::stdin().read_line(&mut min_interval).unwrap();
     let min_interval = min_interval.trim().parse::<u64>().unwrap_or(10);
 
     // 最大间隔
-    print!("最大间隔(毫秒) (默认50): ");
+    print!("最大间隔(ms) (默认50): ");
     io::stdout().flush().unwrap();
     let mut max_interval = String::new();
     io::stdin().read_line(&mut max_interval).unwrap();
     let max_interval = max_interval.trim().parse::<u64>().unwrap_or(50);
 
-    Some(SlowlorisConfig {
-        target,
-        port,
-        connections,
-        duration,
-        mode,
-        timeout,
-        keep_alive,
-        random_headers,
-        min_interval,
-        max_interval,
-    })
+    // 攻击模式
+    print!("攻击模式 (normal/stealth/aggressive, 默认{}): ", app_config.default_mode);
+    io::stdout().flush().unwrap();
+    let mut mode = String::new();
+    io::stdin().read_line(&mut mode).unwrap();
+    let mode = mode.trim().to_lowercase();
+    let mode = if mode.is_empty() || (mode != "normal" && mode != "stealth" && mode != "aggressive") {
+        app_config.default_mode.clone()
+    } else {
+        mode
+    };
+
+    let mut config = AttackConfig::new(AttackType::Slowloris, target, port);
+    config.connections = connections;
+    config.duration = duration;
+    config.timeout = timeout;
+    config.keep_alive = keep_alive;
+    config.random_headers = random_headers;
+    config.min_interval = min_interval;
+    config.max_interval = max_interval;
+    config.mode = mode;
+
+    Some(config)
 }
 
-fn get_syn_config(app_config: &AppConfig) -> Option<SynFloodConfig> {
-    println!("\n🌊 SYN洪水攻击配置");
+fn get_syn_config(app_config: &AppConfig) -> Option<AttackConfig> {
+    println!("\n🔗 SYN洪水攻击配置");
     println!("===================");
 
     // 目标
@@ -580,11 +607,18 @@ fn get_syn_config(app_config: &AppConfig) -> Option<SynFloodConfig> {
     let duration = duration.trim().parse::<u64>().unwrap_or(app_config.default_duration);
 
     // 数据包大小
-    print!("数据包大小(字节) (默认{}): ", app_config.default_packet_size);
+    print!("数据包大小 (默认{}): ", app_config.default_packet_size);
     io::stdout().flush().unwrap();
     let mut packet_size = String::new();
     io::stdin().read_line(&mut packet_size).unwrap();
     let packet_size = packet_size.trim().parse::<usize>().unwrap_or(app_config.default_packet_size);
+
+    // 伪造源IP
+    print!("伪造源IP? (y/N): ");
+    io::stdout().flush().unwrap();
+    let mut spoof_ip = String::new();
+    io::stdin().read_line(&mut spoof_ip).unwrap();
+    let spoof_ip = spoof_ip.trim().to_lowercase() == "y";
 
     // 攻击模式
     print!("攻击模式 (normal/stealth/aggressive, 默认{}): ", app_config.default_mode);
@@ -598,20 +632,12 @@ fn get_syn_config(app_config: &AppConfig) -> Option<SynFloodConfig> {
         mode
     };
 
-    // 伪造源IP
-    print!("伪造源IP? (y/N): ");
-    io::stdout().flush().unwrap();
-    let mut spoof_ip = String::new();
-    io::stdin().read_line(&mut spoof_ip).unwrap();
-    let spoof_ip = spoof_ip.trim().to_lowercase() == "y";
+    let mut config = AttackConfig::new(AttackType::Syn, target, port);
+    config.connections = connections;
+    config.duration = duration;
+    config.packet_size = packet_size;
+    config.spoof_ip = spoof_ip;
+    config.mode = mode;
 
-    Some(SynFloodConfig {
-        target,
-        port,
-        connections,
-        duration,
-        packet_size,
-        mode,
-        spoof_ip,
-    })
+    Some(config)
 } 
