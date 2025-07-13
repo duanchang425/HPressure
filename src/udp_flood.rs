@@ -60,9 +60,8 @@ pub async fn run_udp_flood(config: UdpFloodConfig) {
             // 设置socket选项（如果支持）
             #[cfg(unix)]
             {
-                // 在较新的Rust版本中，这些方法已被移除，我们跳过这些设置
-                // socket.set_send_buffer_size(65536).ok();
-                // socket.set_recv_buffer_size(65536).ok();
+                socket.set_send_buffer_size(65536).ok();
+                socket.set_recv_buffer_size(65536).ok();
             }
 
             // 生成随机数据包
