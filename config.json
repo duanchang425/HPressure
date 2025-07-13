@@ -4,6 +4,7 @@
   "default_tcp_connections": 1000,
   "default_icmp_connections": 1000,
   "default_slowloris_connections": 500,
+  "default_syn_connections": 1000,
   "default_duration": 60,
   "default_packet_size": 1024,
   "default_mode": "normal",
